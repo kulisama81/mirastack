@@ -4,7 +4,7 @@
  * MiraStack Daily Digest — site health, agent activity, and growth signals via email.
  * Sends via Resend API on a cron schedule.
  *
- * Usage: node scripts/daily-digest.mjs
+ * Usage: node bin/daily-digest.mjs
  *
  * Requires: RESEND_API_KEY env var
  *
@@ -164,7 +164,7 @@ async function main() {
     s.push(metricBox(mobile, 'mobile', '#fceef5'));
     s.push(`</tr></table>`);
   } else {
-    s.push(`<p style="color:#999;font-style:italic;">No analytics data — run scripts/pull-analytics.mjs</p>`);
+    s.push(`<p style="color:#999;font-style:italic;">No analytics data — run bin/pull-analytics.mjs</p>`);
   }
 
   s.push(`<h3 style="margin:16px 0 8px;color:#1a1a2e;">Content</h3>`);

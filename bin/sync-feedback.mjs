@@ -7,7 +7,7 @@
  * corresponding tkt tickets (if not already synced).
  *
  * Usage:
- *   node scripts/sync-feedback.mjs
+ *   node bin/sync-feedback.mjs
  *
  * Requires:
  *   - GITHUB_TOKEN env var (repo issues scope)

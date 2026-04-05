@@ -46,6 +46,22 @@ Hooks chain the pipeline automatically. The planner only needs to spawn `@creato
 
 ## Quick Start
 
+### Option A: Install as a Claude Code Plugin (recommended)
+
+```bash
+claude plugin install kulisama81/mirastack
+```
+
+This loads all 6 agents, hooks, and scripts automatically. Then:
+
+1. Copy and edit the workflow config: `cp templates/workflow-config.json .claude/workflow-config.json`
+2. Set up [tkt](https://github.com/lawrips/tkt): `go install github.com/lawrips/tkt@latest && tkt init`
+3. Add tkt as an MCP server in `.mcp.json`
+4. Write your CLAUDE.md (see `templates/CLAUDE.md.example`)
+5. Set up cron for autonomous operation (see step 7 below)
+
+### Option B: Manual install
+
 ### 1. Copy agents into your project
 
 ```bash
@@ -67,12 +83,12 @@ Edit `.claude/workflow-config.json` to match your project:
 
 ### 3. Merge hooks into your settings
 
-Copy the hooks from `hooks/pipeline.json` into your `.claude/settings.json`. If you already have hooks, merge the arrays.
+Copy the hooks from `hooks/hooks.json` into your `.claude/settings.json`. If you already have hooks, merge the arrays.
 
 ### 4. Copy scripts
 
 ```bash
-cp -r /path/to/mirastack/scripts/ scripts/
+cp -r /path/to/mirastack/bin/ bin/
 ```
 
 Scripts read configuration from `workflow-config.json` — no hardcoded values to change.
@@ -168,7 +184,7 @@ Feeds real traffic data to @planner and @autoresearch for data-driven prioritiza
 1. Create a GA4 service account and download credentials
 2. Save as `.ga-credentials.json` (gitignored)
 3. Set `analytics.propertyId` in workflow-config.json
-4. Run `node scripts/pull-analytics.mjs`
+4. Run `node bin/pull-analytics.mjs`
 
 ### Google Search Console
 Adds search query data (impressions, clicks, CTR, position) to the analytics report.
@@ -182,7 +198,7 @@ Sends a daily summary of traffic, content health, pipeline activity, and unpushe
 1. Sign up for [Resend](https://resend.com) and verify your domain
 2. Set `RESEND_API_KEY` in your `.env`
 3. Configure `digest.toEmail`, `digest.fromEmail`, `digest.projectName`
-4. Add to cron: `0 8 * * * cd /path/to/project && node scripts/daily-digest.mjs`
+4. Add to cron: `0 8 * * * cd /path/to/project && node bin/daily-digest.mjs`
 
 ### GitHub Issues → tkt Sync
 Automatically creates tkt tickets from GitHub Issues with a specific label.

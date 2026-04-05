@@ -8,9 +8,9 @@
  * Projects can add custom checks via the config.
  *
  * Usage:
- *   node scripts/content-validate.mjs                          # all content
- *   node scripts/content-validate.mjs <path/to/file>           # single file
- *   node scripts/content-validate.mjs --ticket t-abc1          # also check acceptance criteria
+ *   node bin/content-validate.mjs                          # all content
+ *   node bin/content-validate.mjs <path/to/file>           # single file
+ *   node bin/content-validate.mjs --ticket t-abc1          # also check acceptance criteria
  */
 
 import { readdir, readFile, mkdir, writeFile } from 'fs/promises';

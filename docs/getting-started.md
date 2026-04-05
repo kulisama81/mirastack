@@ -38,7 +38,7 @@ Edit the file to match your project. At minimum, set:
 
 ```bash
 mkdir -p scripts
-cp /path/to/mirastack/scripts/*.mjs scripts/
+cp /path/to/mirastack/bin/*.mjs bin/
 ```
 
 The scripts read all configuration from `workflow-config.json`, so no hardcoded values need changing.
@@ -59,16 +59,16 @@ npm install @google-analytics/data googleapis
 
 The hook pipeline is what makes MiraStack autonomous — it chains agents automatically after each step completes.
 
-Copy the hooks from `hooks/pipeline.json` into your `.claude/settings.json`:
+Copy the hooks from `hooks/hooks.json` into your `.claude/settings.json`:
 
 ```json
 {
   "hooks": {
     "SubagentStop": [
-      // ... paste from hooks/pipeline.json
+      // ... paste from hooks/hooks.json
     ],
     "PreToolUse": [
-      // ... paste from hooks/pipeline.json
+      // ... paste from hooks/hooks.json
     ]
   }
 }

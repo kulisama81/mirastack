@@ -6,9 +6,9 @@
  * Project-specific checks (KaTeX, Mermaid, etc.) are loaded from workflow-config.json.
  *
  * Usage:
- *   node scripts/ux-review.mjs                          # all pages
- *   node scripts/ux-review.mjs <page-path>              # single page
- *   node scripts/ux-review.mjs --url http://localhost:3000  # existing server
+ *   node bin/ux-review.mjs                          # all pages
+ *   node bin/ux-review.mjs <page-path>              # single page
+ *   node bin/ux-review.mjs --url http://localhost:3000  # existing server
  */
 
 import { spawn } from 'child_process';

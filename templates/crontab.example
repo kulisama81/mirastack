@@ -17,15 +17,15 @@
 # ──────────────────────────────────────────────────────────────────
 # pull-analytics — refresh traffic data for agents (daily, early AM)
 # ──────────────────────────────────────────────────────────────────
-0 1 * * * cd /path/to/your/project && node scripts/pull-analytics.mjs >> .claude/analytics-cron.log 2>&1
+0 1 * * * cd /path/to/your/project && node bin/pull-analytics.mjs >> .claude/analytics-cron.log 2>&1
 
 # ──────────────────────────────────────────────────────────────────
 # daily-digest — email summary of site health and agent activity
 # ──────────────────────────────────────────────────────────────────
-0 8 * * * cd /path/to/your/project && node scripts/daily-digest.mjs >> .claude/digest-cron.log 2>&1
+0 8 * * * cd /path/to/your/project && node bin/daily-digest.mjs >> .claude/digest-cron.log 2>&1
 
 # ──────────────────────────────────────────────────────────────────
 # sync-feedback — pull GitHub Issues into tkt (runs on SessionStart
 # hook by default, but can also be cron'd for non-interactive sync)
 # ──────────────────────────────────────────────────────────────────
-*/30 * * * * cd /path/to/your/project && node scripts/sync-feedback.mjs >> .claude/feedback-sync-cron.log 2>&1
+*/30 * * * * cd /path/to/your/project && node bin/sync-feedback.mjs >> .claude/feedback-sync-cron.log 2>&1

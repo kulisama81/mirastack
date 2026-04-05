@@ -5,8 +5,8 @@
  * Agents (@planner, @autoresearch) read this report to prioritize by real traffic.
  *
  * Usage:
- *   node scripts/pull-analytics.mjs                # last 28 days (default)
- *   node scripts/pull-analytics.mjs --days 7       # last 7 days
+ *   node bin/pull-analytics.mjs                # last 28 days (default)
+ *   node bin/pull-analytics.mjs --days 7       # last 7 days
  *
  * Requires:
  *   - .ga-credentials.json (service account key, gitignored)

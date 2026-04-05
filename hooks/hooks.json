@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/sync-feedback.mjs 2>/dev/null || true",
+            "command": "node bin/sync-feedback.mjs 2>/dev/null || true",
             "statusMessage": "Syncing user feedback..."
           }
         ]

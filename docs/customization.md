@@ -4,7 +4,7 @@ MiraStack is designed to be extended. All project-specific behavior is configure
 
 ## Adding Custom Validation Checks
 
-The content validator (`scripts/content-validate.mjs`) runs checks based on the `validator.checks` array in workflow-config.json.
+The content validator (`bin/content-validate.mjs`) runs checks based on the `validator.checks` array in workflow-config.json.
 
 ### Built-in checks
 
@@ -31,7 +31,7 @@ Enable or disable by editing the `validator.checks` array:
 
 ### Adding a new check
 
-To add a project-specific check, edit `scripts/content-validate.mjs`:
+To add a project-specific check, edit `bin/content-validate.mjs`:
 
 1. Add a check function following the pattern of existing checks
 2. Add a key for it in the `enabledChecks` logic
@@ -55,7 +55,7 @@ function checkMyThing(file, content) {
 
 ## Customizing UX Review Checks
 
-The UX review script (`scripts/ux-review.mjs`) runs Puppeteer checks based on `uxReviewer.checks`.
+The UX review script (`bin/ux-review.mjs`) runs Puppeteer checks based on `uxReviewer.checks`.
 
 ### Built-in checks
 
@@ -69,7 +69,7 @@ The UX review script (`scripts/ux-review.mjs`) runs Puppeteer checks based on `u
 
 ### Adding a custom check
 
-Edit `scripts/ux-review.mjs` and add your check to the `reviewPage` function:
+Edit `bin/ux-review.mjs` and add your check to the `reviewPage` function:
 
 ```js
 if (checks.includes('my-check')) {

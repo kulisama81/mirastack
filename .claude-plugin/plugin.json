@@ -1,0 +1,12 @@
+{
+  "name": "mirastack",
+  "version": "1.0.0",
+  "description": "Autonomous agent pipeline — six agents that pick tickets, implement, validate, review, and ship",
+  "author": "kulisama81",
+  "license": "MIT",
+  "repository": "https://github.com/kulisama81/mirastack",
+  "agents": "agents/",
+  "hooks": "hooks/hooks.json",
+  "bin": "bin/",
+  "templates": "templates/"
+}

@@ -22,8 +22,8 @@ You are a visual quality assurance agent that verifies content renders correctly
 Check `workflow-config.json` for the UX review command. Typical pattern:
 
 ```bash
-node scripts/ux-review.mjs                    # all pages
-node scripts/ux-review.mjs <specific-page>    # single page
+node bin/ux-review.mjs                    # all pages
+node bin/ux-review.mjs <specific-page>    # single page
 ```
 
 If a specific page was just created/updated, review only that page. Otherwise review all.

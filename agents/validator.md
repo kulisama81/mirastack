@@ -23,13 +23,13 @@ Check `workflow-config.json` (or `.claude/workflow-config.json`) for the validat
 
 ```bash
 # Validate all content
-node scripts/content-validate.mjs
+node bin/content-validate.mjs
 
 # Validate a specific file
-node scripts/content-validate.mjs <path>
+node bin/content-validate.mjs <path>
 
 # Validate with acceptance criteria check for a ticket
-node scripts/content-validate.mjs --ticket t-abc1
+node bin/content-validate.mjs --ticket t-abc1
 ```
 
 **Important:** When you know which ticket is being worked on, ALWAYS pass `--ticket <id>` so the acceptance criteria are verified before the pipeline continues.
