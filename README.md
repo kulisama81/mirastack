@@ -14,23 +14,28 @@ MiraStack is the stitching, done once, so you don't have to.
 
 Six specialized agents and a hook pipeline that chains them automatically:
 
-```
-  @planner picks the highest-impact ticket
-       ↓
-  @creator implements (follows your CLAUDE.md)
-       ↓  [hook]
-  /simplify reviews code quality
-       ↓
-  @validator runs build + static analysis
-       ↓  [hook]
-  @reviewer checks domain accuracy
-       ↓  [hook]
-  @ux-reviewer renders in a headless browser
-       ↓
-  ticket closed, commit created
+```mermaid
+flowchart TD
+    backlog["tkt backlog"] --> planner["@planner\npicks highest-impact ticket"]
+    planner --> creator["@creator\nimplements · follows CLAUDE.md"]
+    creator -->|hook| simplify["/simplify\ncode quality review"]
+    simplify --> validator["@validator\nbuild gate · static analysis"]
+    validator -->|hook| reviewer["@reviewer\ndomain accuracy check"]
+    reviewer -->|hook| ux["@ux-reviewer\nheadless browser render"]
+    ux --> closed["ticket closed · commit created"]
+    closed -.->|"cron · next cycle"| backlog
+
+    style backlog fill:#f9f9f9,stroke:#ccc
+    style planner fill:#e8f0fe,stroke:#4a86c8
+    style creator fill:#e8f0fe,stroke:#4a86c8
+    style simplify fill:#fef7e0,stroke:#d4a017
+    style validator fill:#e8f0fe,stroke:#4a86c8
+    style reviewer fill:#e8f0fe,stroke:#4a86c8
+    style ux fill:#e8f0fe,stroke:#4a86c8
+    style closed fill:#e6f4ea,stroke:#34a853
 ```
 
-The planner spawns the creator. Hooks handle the rest. You don't orchestrate — you review the output.
+The planner spawns the creator. Hooks handle the rest. The dotted line back to the backlog is cron — the loop runs autonomously on a schedule. You don't orchestrate — you review the output.
 
 | Agent | Role |
 |---|---|
