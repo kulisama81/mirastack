@@ -25,7 +25,10 @@ flowchart TD
     ux --> closed["ticket closed · commit created"]
     closed -.->|"cron · next cycle"| backlog
 
+    autoresearch["@autoresearch\nscouts gaps · creates tickets"] -.->|"weekly cron"| backlog
+
     style backlog fill:#f9f9f9,stroke:#ccc
+    style autoresearch fill:#f3e8fd,stroke:#8e44ad
     style planner fill:#e8f0fe,stroke:#4a86c8
     style creator fill:#e8f0fe,stroke:#4a86c8
     style simplify fill:#fef7e0,stroke:#d4a017
