@@ -105,14 +105,29 @@ See `templates/CLAUDE.md.example` for a template. The agents read CLAUDE.md for:
 - Domain knowledge (what "correct" means for your content)
 - Content patterns (markup, components, formatting rules)
 
-### 7. (Optional) Set up cron
+### 7. Set up cron for autonomous operation
 
-Copy `templates/crontab.example` and adjust paths:
+This is what makes MiraStack autonomous — agents run on a schedule, pick tickets, and ship while you're away.
+
+Copy and edit the crontab template:
 
 ```bash
-crontab -e
-# Paste and edit the crontab entries
+cp /path/to/mirastack/templates/crontab.example /tmp/mirastack-cron
+# Edit /tmp/mirastack-cron — replace /path/to/your/project with your actual path
+crontab /tmp/mirastack-cron
 ```
+
+Recommended schedule:
+
+| Job | Schedule | What it does |
+|---|---|---|
+| `pull-analytics.mjs` | Daily 1 AM | Refreshes traffic data so agents prioritize by real usage |
+| `@planner` | Twice daily, 2 AM + 2 PM | Picks 2-3 tickets, runs the full pipeline, commits |
+| `@autoresearch` | Weekly, Monday 3 AM | Discovers content gaps, SEO issues, competitor features |
+| `daily-digest.mjs` | Daily 8 AM | Emails you a summary of traffic + agent activity |
+| `sync-feedback.mjs` | Every 30 min | Pulls GitHub Issues into tkt tickets |
+
+The planner commits but never pushes — you review with `git log origin/main..HEAD` and push when satisfied. See [docs/cron-setup.md](docs/cron-setup.md) for full details.
 
 ## Configuration
 
