@@ -1,0 +1,53 @@
+{
+  "planner": {
+    "maxSessionMinutes": 60,
+    "maxTicketsPerSession": 3,
+    "analyticsReportPath": "src/data/analytics-report.json"
+  },
+  "validator": {
+    "buildCommand": "npm run build",
+    "contentDir": "src/content",
+    "contentExtensions": [".md", ".mdx"],
+    "requiredFrontmatterFields": ["title"],
+    "checks": [
+      "build",
+      "frontmatter",
+      "heading-hierarchy",
+      "katex",
+      "svg-blank-lines",
+      "html-comments",
+      "video-embeds"
+    ]
+  },
+  "uxReviewer": {
+    "baseUrl": null,
+    "devCommand": "npx astro dev",
+    "port": 4322,
+    "checks": [
+      "console-errors",
+      "broken-images",
+      "layout-overflow",
+      "katex",
+      "mermaid"
+    ]
+  },
+  "feedbackSync": {
+    "repo": "owner/repo",
+    "label": "user-submitted",
+    "syncedLabel": "synced-to-tkt"
+  },
+  "analytics": {
+    "propertyId": "",
+    "gscSiteUrl": "",
+    "credentialsPath": ".ga-credentials.json",
+    "outputPath": "src/data/analytics-report.json"
+  },
+  "digest": {
+    "toEmail": [],
+    "fromEmail": "",
+    "projectName": "My Project",
+    "analyticsPath": "src/data/analytics-report.json",
+    "historyPath": "src/data/digest-history.json",
+    "contentDir": "src/content"
+  }
+}

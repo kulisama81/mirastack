@@ -1,0 +1,31 @@
+# MiraStack Agent Cron Schedule
+# Copy this file and adjust paths and schedules to match your setup.
+#
+# Prerequisite: Claude Code CLI installed and authenticated.
+# Each job runs `claude` in the project directory with the specified agent.
+
+# ──────────────────────────────────────────────────────────────────
+# @planner — autonomous ticket executor (runs twice daily)
+# ──────────────────────────────────────────────────────────────────
+0 2,14 * * * cd /path/to/your/project && claude --agent planner --print --output-format stream-json >> .claude/planner-cron.log 2>&1
+
+# ──────────────────────────────────────────────────────────────────
+# @autoresearch — discovers opportunities and creates tickets (weekly)
+# ──────────────────────────────────────────────────────────────────
+0 3 * * 1 cd /path/to/your/project && claude --agent autoresearch --print --output-format stream-json >> .claude/autoresearch-cron.log 2>&1
+
+# ──────────────────────────────────────────────────────────────────
+# pull-analytics — refresh traffic data for agents (daily, early AM)
+# ──────────────────────────────────────────────────────────────────
+0 1 * * * cd /path/to/your/project && node scripts/pull-analytics.mjs >> .claude/analytics-cron.log 2>&1
+
+# ──────────────────────────────────────────────────────────────────
+# daily-digest — email summary of site health and agent activity
+# ──────────────────────────────────────────────────────────────────
+0 8 * * * cd /path/to/your/project && node scripts/daily-digest.mjs >> .claude/digest-cron.log 2>&1
+
+# ──────────────────────────────────────────────────────────────────
+# sync-feedback — pull GitHub Issues into tkt (runs on SessionStart
+# hook by default, but can also be cron'd for non-interactive sync)
+# ──────────────────────────────────────────────────────────────────
+*/30 * * * * cd /path/to/your/project && node scripts/sync-feedback.mjs >> .claude/feedback-sync-cron.log 2>&1

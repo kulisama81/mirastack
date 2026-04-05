@@ -1,0 +1,60 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/sync-feedback.mjs 2>/dev/null || true",
+            "statusMessage": "Syncing user feedback..."
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "creator",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SubagentStop\",\"additionalContext\":\"The creator agent has finished making changes. You MUST now: 1) Run /simplify to review the changed code for reuse, quality, and efficiency. 2) After /simplify completes, spawn the @validator agent to run content and build validation.\"}}'",
+            "statusMessage": "Queuing /simplify + @validator pipeline..."
+          }
+        ]
+      },
+      {
+        "matcher": "validator",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SubagentStop\",\"additionalContext\":\"The validator agent has finished validation. You MUST now spawn the @reviewer agent to verify domain accuracy of the created or modified content.\"}}'",
+            "statusMessage": "Queuing @reviewer..."
+          }
+        ]
+      },
+      {
+        "matcher": "reviewer",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"SubagentStop\",\"additionalContext\":\"The reviewer agent has finished checking domain accuracy. You MUST now spawn the @ux-reviewer agent to check for rendering issues before the ticket can be closed.\"}}'",
+            "statusMessage": "Queuing @ux-reviewer..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "mcp__tkt__edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "STATUS=$(cat | jq -r '.tool_input.status // empty'); if [ \"$STATUS\" = \"closed\" ]; then LATEST=$(ls -t .ux-reviews/*/report.json 2>/dev/null | head -1); if [ -z \"$LATEST\" ] || [ $(( $(date +%s) - $(stat -f %m \"$LATEST\") )) -gt 1800 ] || [ $(jq '.totalIssues' \"$LATEST\" 2>/dev/null || echo 1) -gt 0 ]; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"No recent clean UX review found. You must spawn the @ux-reviewer agent and get a clean report (0 issues) before closing any ticket.\"}}'; fi; fi",
+            "statusMessage": "Checking UX review status...",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

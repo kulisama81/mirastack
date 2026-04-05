@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "tkt": {
+      "command": "/Users/loideniel/go/bin/tkt",
+      "args": ["mcp"]
+    }
+  }
+}

@@ -1,0 +1,56 @@
+# My Project — CLAUDE.md
+
+## Project Overview
+A brief description of what your project does and who it serves.
+
+## Tech Stack
+- **Framework**: (e.g., Astro, Next.js, Rails)
+- **Language**: (e.g., TypeScript, Python)
+- **Key dependencies**: (list the important ones)
+
+## Commands
+- `npm run dev` — start dev server
+- `npm run build` — build for production
+- `npm test` — run tests
+
+## Content Structure
+```
+src/content/
+├── guides/        # study guides, blog posts, documentation, etc.
+└── pages/         # static pages
+```
+
+Describe your content organization here. MiraStack agents read this section
+to understand where files live and how they're structured.
+
+## Content Conventions
+Describe formatting rules, markup patterns, and component usage.
+The @creator agent follows these conventions exactly.
+
+Examples:
+- Math: `$x^2$` (inline), `$$\frac{a}{b}$$` (display)
+- Callouts: `<div class="callout">...</div>`
+- Code blocks: always include language identifier
+
+## Agent Workflow
+MiraStack agents coordinate through tkt tickets:
+
+1. **@planner** — picks highest-impact ticket, delegates to agents
+2. **@creator** — implements changes following conventions above
+3. **@validator** — runs static analysis and build checks
+4. **@reviewer** — checks domain accuracy
+5. **@ux-reviewer** — headless browser rendering checks
+6. **@autoresearch** — discovers opportunities, creates tickets
+
+### Flow
+Planner picks ticket → Creator implements → Validator checks build →
+Reviewer checks accuracy → UX Reviewer checks rendering → Ticket closed
+
+## Domain Knowledge
+Describe your project's domain here. The @reviewer agent reads this section
+to understand what "correct" means for your content.
+
+For example:
+- "This is an IB Biology study guide — all content must align with the current IB syllabus"
+- "This is API documentation — all code examples must be runnable"
+- "This is a recipe blog — nutritional info must be accurate"
