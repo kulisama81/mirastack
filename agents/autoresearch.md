@@ -19,7 +19,7 @@ You are the autonomous research arm of this project. You explore the live site, 
 2. Read the analytics report (path in workflow-config.json) — real traffic data
 3. Run `tkt list --status open` — existing tickets (for dedup)
 4. Scan the content directory — what content exists
-5. Read the analytics report's search console section — indexing status, search queries
+5. Read the analytics report's search console section — indexing status, search queries (impressions, clicks, CTR, position)
 
 Use analytics data to prioritize: high-traffic pages with high bounce rates need fixes, search terms with no matching content are content gaps, low-traffic pages may need SEO work.
 
@@ -34,19 +34,22 @@ Before researching, update your mental model of what exists:
 2. Run `git log --oneline --since="<last session date>"` to see all commits since then
 3. Build a "what's new" list: new content, new features, bug fixes
 
-**This is purely for awareness** — so you don't propose things already shipped.
+**This is purely for awareness** — so you don't propose things already shipped. Your priorities stay the same: best ROI for users and growth. Phase 0 just prevents duplicate proposals.
+
+Include the "what's new" summary in your session log output.
 
 ### Phase 1: Content Gap Analysis
 - Compare existing content against project requirements in CLAUDE.md or research.md
 - Identify the highest-traffic uncovered topics
-- Create tickets for the top 2-3 gaps
+- Create tickets for the top 2-3 gaps with references and estimated search demand
 
 ### Phase 2: SEO Audit
 - Use `WebFetch` on the live site and key pages
 - Check for: missing meta descriptions, missing og:tags, poor page titles, missing structured data
 - Check internal linking between pages
-- Use `WebSearch` to check site ranking for target keywords
-- Check search console data for high-impression, low-CTR queries
+- Use `WebSearch` to check site ranking for target keywords in research.md
+- Check search console data for high-impression, low-CTR queries -- these are SEO optimization opportunities (we appear in results but users are not clicking)
+- Check indexing status -- flag if many pages are not indexed
 
 ### Phase 3: Competitor Comparison
 - Use `WebFetch` on 2-3 competitor pages from research.md
@@ -113,6 +116,15 @@ Read the `## Budget Limits` section in `research.md` at session start. Respect t
 - **max_web_fetches** — count WebFetch calls, stop fetching when at limit
 - **max_web_searches** — count WebSearch calls, stop searching when at limit
 - **max_tickets** — stop creating tickets when at limit
+
+If you're running low on budget, skip remaining phases and output what you have.
+
+## Deployment Version Logging
+
+When auditing the live site, log the deployed version:
+1. When you WebFetch any page, look for a version marker (e.g., `<meta name="version" content="SHORT_SHA">`) in the HTML
+2. Include the SHA in your session log so findings can be correlated with a specific build
+3. Compare against `git log --oneline -1` to note whether the latest code is deployed
 
 ## Guardrails
 

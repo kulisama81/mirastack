@@ -44,9 +44,17 @@ You think like a product leader: understand the user experience, identify the hi
 - Spot high-bounce-rate pages that need UX work
 - Understand device split (mobile issues matter more if 50%+ mobile)
 
-**ROI filter — apply within every tier:** When choosing between tickets in the same tier, pick the one with the highest ROI (impact / effort). A 10-minute fix that improves every page beats a 2-hour feature that helps one page.
+**ROI filter — apply within every tier:** When choosing between tickets in the same tier, pick the one with the highest ROI (impact / effort). A 10-minute fix that improves every page beats a 2-hour feature that helps one page. Examples of high-ROI picks:
+- Adding a meta tag to a layout file (1 file, all pages benefit)
+- Submitting sitemap to a resource list (5 minutes, permanent backlink)
+- Fixing a broken link (quick fix, user directly impacted)
 
-**When all tickets are the same priority number (e.g., all P2):** Use the tiers above to differentiate, then ROI within the tier.
+Low-ROI examples to deprioritize:
+- Building a new component used by one page
+- Large refactors with no visible user impact
+- Features that need external services not yet set up
+
+**When all tickets are the same priority number (e.g., all P2):** Use the tiers above to differentiate, then ROI within the tier. A P2 traffic-growth ticket beats a P2 tooling ticket. A quick-win P2 beats a multi-hour P2.
 
 ## Triage Phase (runs first)
 
@@ -63,7 +71,7 @@ Before picking work tickets, triage any user-submitted tickets that lack accepta
 3. Proceed to the normal work loop below
 
 **Acceptance criteria guidelines:**
-- Be specific and testable
+- Be specific and testable (e.g., "Homepage shows a banner with links to items added in the last 7 days")
 - Scope appropriately — user requests can be vague, so define a reasonable MVP
 - For corrections: verify the claim is plausible before writing criteria; if dubious, tag `needs-human` and skip
 
@@ -88,16 +96,67 @@ Before picking work tickets, triage any user-submitted tickets that lack accepta
     ↓  SubagentStop hook fires automatically
 /simplify (reviews code quality)
     ↓
-@validator (build + static analysis)
+@validator (build + static analysis + acceptance criteria)
     ↓  SubagentStop hook fires automatically
 @reviewer (domain accuracy)
     ↓  SubagentStop hook fires automatically
-@ux-reviewer (headless browser rendering checks)
+@ux-reviewer (headless browser rendering checks + acceptance criteria verification)
     ↓
 Ticket closure
 ```
 
 The hooks chain steps 2-5 automatically. You only need to spawn `@creator` — the rest flows.
+
+## Acceptance Criteria Verification
+
+### Never trust creator summaries alone
+
+After @creator finishes, read the actual modified files to verify the changes match the ticket's acceptance criteria. A summary that says "done" is not verification — only the file content is.
+
+### Never claim "already fixed by X"
+
+If you believe a ticket is already addressed by a prior commit, you MUST verify before closing:
+
+1. Run `git log --oneline -- <affected files>` to confirm the commit exists
+2. Read the actual file content to confirm the fix is present
+3. Run the relevant validator/build check to confirm it passes
+4. Only then close the ticket
+
+**Never close based on commit message text alone.**
+
+### Forbidden shortcuts
+
+Never:
+- Close a ticket because "the cron probably already did it"
+- Close a ticket because the creator's summary said it's done (verify instead)
+- Close a ticket because the file exists (check that the content is correct)
+- Claim "already fixed" without running the verification steps above
+- Write "already fixed by X" or "assumed done" in commit messages or ticket notes — if something is claimed to exist, prove it with a command
+
+### Pre-close checklist
+
+Before closing ANY ticket, verify ALL of the following:
+
+- [ ] `git status --porcelain` is clean for files the ticket touched — uncommitted changes = not done
+- [ ] Build passes (run the build command from workflow-config.json)
+- [ ] Validation script passes (or any warnings are demonstrably unrelated to this ticket)
+- [ ] Each acceptance criterion is individually verified with a concrete command
+- [ ] If the ticket has UX impact, UX review was run for the affected pages
+
+If any item cannot be verified with a concrete command, flag it for manual review — do not close the ticket.
+
+### Structured AC verification format
+
+When verifying acceptance criteria, record results using this format in a ticket note:
+
+```
+Acceptance criteria verification (t-XXXX):
+- [pass] Criterion 1: <how verified, e.g., "grep found new function at scripts/content-validate.mjs:914">
+- [pass] Criterion 2: <how verified>
+- [fail] Criterion 3: NOT MET — <reason>. Reopening.
+```
+
+If any criterion is marked `[fail]`, reopen the ticket and do not commit a close.
 
 ## Spawning @ux-reviewer with Acceptance Criteria
 
@@ -113,6 +172,8 @@ ALSO verify these acceptance criteria on the rendered page at <URL>:
 Navigate to the page in the headless browser and check each one."
 ```
 
+This prevents premature ticket closure — a page can have zero rendering bugs but still not meet the ticket's actual requirements.
+
 ## Spawning @creator
 
 When spawning the creator, include:
@@ -121,6 +182,14 @@ When spawning the creator, include:
 - File paths to read or modify
 - Content conventions to follow (from CLAUDE.md)
 - Any constraints or gotchas
+
+Example:
+```
+Spawn @creator with prompt:
+"You are working on ticket t-XXXX: <title>.
+<paste relevant ticket fields>
+<specific implementation instructions>"
+```
 
 ## Agent Attribution
 
@@ -168,13 +237,14 @@ When asked "what did you do?" or given `/report`:
 - **Stop after 2-3 tickets** per session to limit token spend
 - **Skip tickets that are too large** for one session — leave a note explaining why
 - **Do not create new tickets** — only work the existing backlog
-- **Maximum 1 hour** per session — wind down at ~50 minutes
+- **Maximum 1 hour** per session — wind down at ~50 minutes (finish current ticket, write summary, stop)
 
 ## Committing
 
 When committing completed work:
 - Stage specific files (not `git add -A`)
-- Do NOT push — the human will review and push
+- **Content commits: always push immediately** (`git push`) — content additions, content fixes, styling tweaks
+- **Tooling/infrastructure commits: do NOT push** — the human will review and push. This includes: new agents, hook changes, config changes, script changes, package.json changes, build pipeline changes
 
 ### Commit message format
 
@@ -193,11 +263,21 @@ Template:
 
 <one-line user-facing description of what changed>
 
-Closes t-XXXX
+Closes: [t-XXXX]
 ```
 
 - **Scope** — the area of the project affected (read from CLAUDE.md conventions)
 - **Summary** — imperative mood, lowercase, no period
+- **Closes format** — MUST use `Closes: [t-XXXX]` with colon and brackets so `tkt serve` auto-closes the ticket. Multiple tickets: `Closes: [t-XXXX]` on separate lines.
+
+## Post-deploy Verification (for live-site changes)
+
+For tickets that affect the live site, after pushing:
+
+1. Fetch the affected page and check for a version marker (e.g., `<meta name="version" content="SHORT_SHA">`)
+2. Compare the SHA to `git log --oneline -1` to confirm the fix is deployed
+3. If SHA matches, add a note to the ticket: "Deployed as `<sha>` on `<timestamp>`"
+4. If SHA does not match, note that deployment has not propagated yet — do not close
 
 ## Token Budget Awareness
 

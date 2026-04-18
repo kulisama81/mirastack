@@ -12,19 +12,78 @@ The content validator (`bin/content-validate.mjs`) runs checks based on the `val
 |---|---|
 | `build` | Runs the build command and fails on error |
 | `frontmatter` | Validates required frontmatter fields |
-| `heading-hierarchy` | Ensures h2 → h3 → h4 order isn't broken |
+| `heading-hierarchy` | Ensures h2 -> h3 -> h4 order isn't broken |
 | `katex` | Checks for unbalanced braces in `$...$` and `$$...$$` |
 | `svg-blank-lines` | Detects blank lines inside SVG blocks in .md files |
 | `html-comments` | Flags `<!-- -->` in .mdx files (should be `{/* */}`) |
-| `video-embeds` | Validates iframe src attributes |
-| `internal-links` | Checks that internal links resolve |
+| `video-embeds` | Validates iframe src attributes and flags placeholder video IDs |
+| `internal-links` | Checks that internal links resolve to real files |
+| `no-placeholder` | Flags "coming soon", "TBD", "TODO", and similar phrases in content |
+| `empty-sections` | Finds headings with no content before the next heading |
+| `duplicate-content` | Detects verbatim paragraphs shared across files in the same category |
+| `content-length` | Advisory warning for files exceeding a configurable line threshold |
+| `companion-sync` | Checks that companion materials (flashcard decks, data files) are up to date |
+| `connected-categories` | Verifies all content categories are wired to site infrastructure |
+| `language-conventions` | Per-subject spelling and orthographic rules for foreign-language content |
+| `hardcoded-consistency` | Flags hardcoded counts (e.g., "4 subjects") that drift from actual content |
 
 Enable or disable by editing the `validator.checks` array:
 
 ```json
 {
   "validator": {
-    "checks": ["build", "frontmatter", "katex"]
+    "checks": ["build", "frontmatter", "katex", "no-placeholder"]
+  }
+}
+```
+
+### Configuring placeholder detection
+
+Customize which phrases are flagged:
+
+```json
+{
+  "validator": {
+    "placeholderPhrases": ["coming soon", "TBD", "TODO", "work in progress"]
+  }
+}
+```
+
+### Configuring language rules
+
+Add per-subject spelling rules for foreign-language content:
+
+```json
+{
+  "validator": {
+    "languageRules": {
+      "ap-french": {
+        "language": "French",
+        "requiredChars": ["e", "a", "c"],
+        "commonErrors": {
+          "francais": "fran\u00e7ais",
+          "reponse": "r\u00e9ponse"
+        }
+      }
+    }
+  }
+}
+```
+
+The key (e.g., `ap-french`) is matched against content file paths. Files whose path or category contains the key will be checked against these rules.
+
+### Configuring companion sync
+
+Enable checking that companion materials stay up to date with content:
+
+```json
+{
+  "validator": {
+    "companionSync": {
+      "enabled": true,
+      "supplementaryDir": "public/data",
+      "supplementaryPattern": "{category}.json"
+    }
   }
 }
 ```
@@ -66,6 +125,37 @@ The UX review script (`bin/ux-review.mjs`) runs Puppeteer checks based on `uxRev
 | `layout-overflow` | Always on — detects horizontal overflow |
 | `katex` | Finds `.katex-error` elements |
 | `mermaid` | Finds `.mermaid` elements without rendered SVGs |
+| `placeholder-text` | Finds placeholder phrases rendered in page text |
+| `grid-stretch` | Detects unequal card widths in grid layouts (configurable selectors) |
+| `raw-svg-text` | Finds SVG attribute strings rendered as visible text |
+| `iframe-issues` | Finds iframes with empty src or zero dimensions |
+
+### Configuring grid stretch selectors
+
+```json
+{
+  "uxReviewer": {
+    "gridSelectors": [".card-grid", ".features-row", ".product-grid"]
+  }
+}
+```
+
+### Configuring ignored request patterns
+
+URLs matching these patterns won't be flagged as failed requests:
+
+```json
+{
+  "uxReviewer": {
+    "ignoredRequestPatterns": [
+      "google-analytics.com",
+      "googletagmanager.com",
+      "/pagefind/",
+      "fonts.googleapis.com"
+    ]
+  }
+}
+```
 
 ### Adding a custom check
 
@@ -81,6 +171,14 @@ if (checks.includes('my-check')) {
   }
 }
 ```
+
+## Customizing the Ticket Closure Gate
+
+The PreToolUse hook on `mcp__tkt__edit` blocks ticket closure unless a recent clean UX review exists. Tickets with certain tags bypass this gate:
+
+**Default bypass tags:** `tooling`, `seo`, `analytics`, `autoresearch`, `growth`, `ordering`, `dx`, `infrastructure`, `ux`, `agent`, `validation`
+
+To customize, edit the `grep -qiE` pattern in `hooks/hooks.json`.
 
 ## Customizing Agent Behavior
 

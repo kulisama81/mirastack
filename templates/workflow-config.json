@@ -16,7 +16,47 @@
       "katex",
       "svg-blank-lines",
       "html-comments",
-      "video-embeds"
+      "video-embeds",
+      "internal-links",
+      "no-placeholder",
+      "empty-sections",
+      "duplicate-content",
+      "content-length",
+      "companion-sync",
+      "connected-categories",
+      "language-conventions",
+      "hardcoded-consistency"
+    ],
+    "companionSync": {
+      "enabled": false,
+      "supplementaryDir": "public/data",
+      "supplementaryPattern": "{category}.json"
+    },
+    "connectedCategories": {
+      "enabled": false,
+      "filesToCheck": [
+        "src/styles/global.css",
+        "src/pages/index.astro"
+      ]
+    },
+    "languageRules": {
+      "_example-subject": {
+        "language": "French",
+        "requiredChars": ["e", "a", "c"],
+        "commonErrors": {
+          "wrong": "correct"
+        }
+      }
+    },
+    "contentLengthThreshold": 1500,
+    "placeholderPhrases": [
+      "coming soon",
+      "placeholder",
+      "check back",
+      "TBD",
+      "TODO",
+      "work in progress",
+      "under construction"
     ]
   },
   "uxReviewer": {
@@ -28,7 +68,24 @@
       "broken-images",
       "layout-overflow",
       "katex",
-      "mermaid"
+      "mermaid",
+      "placeholder-text",
+      "grid-stretch",
+      "raw-svg-text",
+      "iframe-issues"
+    ],
+    "gridSelectors": [
+      ".subjects-grid",
+      ".features-row"
+    ],
+    "ignoredRequestPatterns": [
+      "google-analytics.com",
+      "googletagmanager.com",
+      "/g/collect",
+      "/pagefind/",
+      "fonts.googleapis.com",
+      "fonts.gstatic.com",
+      "cdn.jsdelivr.net"
     ]
   },
   "feedbackSync": {

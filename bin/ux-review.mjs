@@ -3,7 +3,8 @@
 /**
  * MiraStack UX Review — headless browser checks for rendered pages.
  * Detects console errors, broken images, layout overflow, and failed requests.
- * Project-specific checks (KaTeX, Mermaid, etc.) are loaded from workflow-config.json.
+ * Project-specific checks (KaTeX, Mermaid, placeholder text, grid stretch,
+ * raw SVG text, iframe issues) are loaded from workflow-config.json.
  *
  * Usage:
  *   node bin/ux-review.mjs                          # all pages
@@ -134,18 +135,27 @@ async function startDevServer(devCommand, port) {
 // Per-page review
 // ---------------------------------------------------------------------------
 
-async function reviewPage(browser, page_info, screenshotDir, checks) {
+async function reviewPage(browser, page_info, screenshotDir, checks, ignoredPatterns) {
   const page = await browser.newPage();
   await page.setViewport({ width: 1280, height: 900 });
 
   const consoleErrors = [];
   const failedRequests = [];
 
+  const defaultIgnored = [
+    'google-analytics.com', 'googletagmanager.com', '/g/collect',
+    '/pagefind/', 'fonts.googleapis.com', 'fonts.gstatic.com', 'cdn.jsdelivr.net',
+  ];
+  const ignored = ignoredPatterns || defaultIgnored;
+
+  function isIgnoredUrl(url) {
+    return ignored.some(pattern => url.includes(pattern));
+  }
+
   page.on('console', msg => {
     if (msg.type() === 'error') {
       const text = msg.text();
       const url = msg.location()?.url || '';
-      // Ignore known dev-only failures
       if (text.includes('pagefind') || url.includes('pagefind')) return;
       consoleErrors.push({ text, url });
     }
@@ -155,18 +165,13 @@ async function reviewPage(browser, page_info, screenshotDir, checks) {
   });
   page.on('requestfailed', req => {
     const url = req.url();
-    // Ignore common expected failures
-    if (url.includes('google-analytics.com') || url.includes('googletagmanager.com') || url.includes('/g/collect')) return;
-    if (url.includes('/pagefind/')) return;
-    if (url.includes('fonts.googleapis.com') || url.includes('fonts.gstatic.com') || url.includes('cdn.jsdelivr.net')) return;
+    if (isIgnoredUrl(url)) return;
     failedRequests.push({ url, failure: req.failure()?.errorText });
   });
   page.on('response', res => {
     if (res.status() >= 400) {
       const url = res.url();
-      if (url.includes('google-analytics.com') || url.includes('googletagmanager.com') || url.includes('/g/collect')) return;
-      if (url.includes('/pagefind/')) return;
-      if (url.includes('fonts.googleapis.com') || url.includes('fonts.gstatic.com') || url.includes('cdn.jsdelivr.net')) return;
+      if (isIgnoredUrl(url)) return;
       failedRequests.push({ url, status: res.status() });
     }
   });
@@ -174,9 +179,13 @@ async function reviewPage(browser, page_info, screenshotDir, checks) {
   await page.goto(page_info.url, { waitUntil: 'networkidle0', timeout: 30000 });
   await new Promise(r => setTimeout(r, 3000));
 
+  // Open all collapsed <details> elements so lazy-loaded content triggers
+  await page.$$eval('details', els => els.forEach(el => el.open = true));
+  await new Promise(r => setTimeout(r, 2000));
+
   const issues = [];
 
-  // --- Console errors ---
+  // --- Console errors (always checked) ---
   for (const e of consoleErrors) {
     issues.push({ type: 'console-error', severity: 'high', detail: e.text, url: e.url });
   }
@@ -225,6 +234,136 @@ async function reviewPage(browser, page_info, screenshotDir, checks) {
     issues.push({ type: 'broken-image', severity: 'medium', detail: img.src, alt: img.alt });
   }
 
+  // --- Empty SVGs ---
+  const emptySvgs = await page.$$eval('.diagram-container svg', svgs =>
+    svgs.filter(svg => svg.children.length === 0).map((_, i) => ({
+      index: i,
+      issue: 'SVG element has no children',
+    }))
+  ).catch(() => []);
+
+  for (const svg of emptySvgs) {
+    issues.push({ type: 'empty-svg', severity: 'medium', detail: `SVG #${svg.index} in .diagram-container` });
+  }
+
+  // --- Raw SVG code rendered as visible text (if enabled) ---
+  if (checks.includes('raw-svg-text')) {
+    const rawSvgAsText = await page.evaluate(() => {
+      const bodyText = document.body.innerText;
+      const svgPatterns = [
+        /text-anchor="middle"/,
+        /font-family=".*serif"/,
+        /stroke-width="\d/,
+        /viewBox="\d/,
+        /fill="#[0-9A-Fa-f]{3,6}"/,
+      ];
+      const matches = svgPatterns.filter(p => p.test(bodyText));
+      return matches.length >= 2 ? { detected: true, matchCount: matches.length } : { detected: false };
+    }).catch(() => ({ detected: false }));
+
+    if (rawSvgAsText.detected) {
+      issues.push({ type: 'raw-svg-text', severity: 'high', detail: `SVG attribute strings found in visible page text (${rawSvgAsText.matchCount} patterns matched) — SVGs likely rendering as raw code` });
+    }
+  }
+
+  // --- Iframe issues (if enabled) ---
+  if (checks.includes('iframe-issues')) {
+    const iframeIssues = await page.$$eval('iframe', iframes =>
+      iframes.map(iframe => {
+        const src = iframe.getAttribute('src') || iframe.getAttribute('data-src') || '';
+        const rect = iframe.getBoundingClientRect();
+        const problems = [];
+
+        if (!src || src === 'about:blank') problems.push('empty-src');
+        if (rect.width === 0 || rect.height === 0) problems.push('zero-dimensions');
+
+        return {
+          src: src.substring(0, 200),
+          width: rect.width,
+          height: rect.height,
+          problems,
+        };
+      }).filter(f => f.problems.length > 0)
+    ).catch(() => []);
+
+    for (const f of iframeIssues) {
+      if (f.problems.includes('empty-src')) {
+        issues.push({ type: 'iframe-empty-src', severity: 'high', detail: `iframe has empty or missing src. src="${f.src}"` });
+      }
+      if (f.problems.includes('zero-dimensions')) {
+        issues.push({ type: 'iframe-zero-dimensions', severity: 'medium', detail: `iframe has zero dimensions (${f.width}x${f.height}). src="${f.src}"` });
+      }
+    }
+  }
+
+  // --- Placeholder text rendered in page (if enabled) ---
+  if (checks.includes('placeholder-text')) {
+    const placeholderTextRendered = await page.evaluate(() => {
+      const bodyText = document.body.innerText;
+      const phrases = [
+        'coming soon', 'placeholder', 'check back', 'TBD', 'TODO',
+        'work in progress', 'under construction',
+      ];
+      return phrases
+        .filter(p => bodyText.toLowerCase().includes(p.toLowerCase()))
+        .map(p => {
+          const idx = bodyText.toLowerCase().indexOf(p.toLowerCase());
+          return {
+            phrase: p,
+            context: bodyText.substring(Math.max(0, idx - 40), idx + p.length + 40).replace(/\n/g, ' '),
+          };
+        });
+    }).catch(() => []);
+
+    for (const p of placeholderTextRendered) {
+      issues.push({ type: 'placeholder-text-rendered', severity: 'high', detail: `Placeholder phrase "${p.phrase}" rendered in page text. Context: "...${p.context}..."` });
+    }
+  }
+
+  // --- Grid stretch regression (if enabled) ---
+  if (checks.includes('grid-stretch')) {
+    const gridSelectors = checks.gridSelectors || ['.subjects-grid', '.features-row'];
+    const selectorString = gridSelectors.join(', ');
+
+    const gridStretchIssues = await page.$$eval(
+      selectorString,
+      grids => {
+        const issues = [];
+        for (const grid of grids) {
+          const children = Array.from(grid.children).filter(c => {
+            const r = c.getBoundingClientRect();
+            return r.width > 0 && r.height > 0;
+          });
+          if (children.length < 2) continue;
+          const widths = children.map(c => c.getBoundingClientRect().width);
+          const minW = Math.min(...widths);
+          const maxW = Math.max(...widths);
+          if (minW === 0) continue;
+          const ratio = maxW / minW;
+          if (ratio > 1.5) {
+            const cls = grid.className ? '.' + grid.className.split(' ')[0] : grid.tagName.toLowerCase();
+            issues.push({
+              container: cls,
+              childCount: children.length,
+              minWidth: Math.round(minW),
+              maxWidth: Math.round(maxW),
+              ratio: ratio.toFixed(2),
+            });
+          }
+        }
+        return issues;
+      }
+    ).catch(() => []);
+
+    for (const g of gridStretchIssues) {
+      issues.push({
+        type: 'grid-stretch',
+        severity: 'medium',
+        detail: `${g.container} has ${g.childCount} children with unequal widths: min=${g.minWidth}px max=${g.maxWidth}px ratio=${g.ratio}. Last row likely stretching to fill.`,
+      });
+    }
+  }
+
   // --- Layout overflow (always checked) ---
   const overflows = await page.evaluate(() => {
     const issues = [];
@@ -251,7 +390,21 @@ async function reviewPage(browser, page_info, screenshotDir, checks) {
   // --- Screenshots ---
   const prefix = page_info.id.replace(/\//g, '--');
   const fullScreenshotPath = join(screenshotDir, `${prefix}--full.png`);
-  await page.screenshot({ path: fullScreenshotPath, fullPage: true });
+  try {
+    await page.screenshot({ path: fullScreenshotPath, fullPage: true });
+  } catch (screenshotErr) {
+    console.log(`    Warning: Full-page screenshot failed (${screenshotErr.message.substring(0, 60)}), taking viewport screenshot`);
+    await page.screenshot({ path: fullScreenshotPath, fullPage: false });
+  }
+
+  // Cropped screenshots for KaTeX errors
+  if (checks.includes('katex')) {
+    const errorEls = await page.$$('.katex-error');
+    for (let i = 0; i < errorEls.length; i++) {
+      const cropPath = join(screenshotDir, `${prefix}--katex-error-${i}.png`);
+      await errorEls[i].screenshot({ path: cropPath });
+    }
+  }
 
   await page.close();
 
@@ -279,6 +432,9 @@ async function main() {
   const contentDir = (config.validator || {}).contentDir || 'src/content';
   const contentExtensions = (config.validator || {}).contentExtensions || ['.md', '.mdx'];
   const checks = uxConfig.checks || ['console-errors', 'broken-images', 'layout-overflow'];
+  // Attach extra config to checks object for use in reviewPage
+  checks.gridSelectors = uxConfig.gridSelectors || ['.subjects-grid', '.features-row'];
+  const ignoredPatterns = uxConfig.ignoredRequestPatterns || null;
 
   let server = null;
   let baseUrl = userUrl || uxConfig.baseUrl || null;
@@ -311,7 +467,7 @@ async function main() {
 
     for (const pageInfo of pages) {
       console.log(`  Reviewing ${pageInfo.id}...`);
-      const result = await reviewPage(browser, pageInfo, screenshotDir, checks);
+      const result = await reviewPage(browser, pageInfo, screenshotDir, checks, ignoredPatterns);
       results.push(result);
 
       const issueCount = result.issues.length;

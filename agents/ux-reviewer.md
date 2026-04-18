@@ -54,6 +54,11 @@ If the planner or caller included acceptance criteria in your prompt, verify EAC
 2. For each criterion, check the DOM/content to confirm it passes
 3. Report each criterion as pass/fail with a note explaining what you found
 
+Example criteria checks:
+- "New section visible on /page/" → navigate to /page/, check if section heading appears in page text
+- "No placeholder text visible" → check page text doesn't match placeholder phrases
+- "Download button at top of page" → check for `.download-btn-header` element
+
 If ANY acceptance criteria fail, report them. Do NOT say "0 issues" if the rendering is clean but acceptance criteria failed — they are separate checks and both must pass.
 
 ### Step 5: Summarize
@@ -68,6 +73,19 @@ Report your findings:
 - **Priority 1 (Critical)**: Parse errors, rendering failures, console errors, 404s
 - **Priority 2 (Important)**: Broken images, empty elements, layout overflow
 - **Priority 3 (Minor)**: Minor visual inconsistencies
+
+## Ticket Conventions
+- Title format: `[UX] {issue-type} in {page}: {brief description}`
+- Always include the file path and screenshot path in ticket notes
+- Tag tickets with `ux` and any relevant category tags
+- Use type `bug` for all rendering issues
+
+## Deployment Version Logging
+
+When reviewing the live site (not local dev server), log the deployed version:
+1. Fetch the page HTML and look for a version marker (e.g., `<meta name="version" content="SHORT_SHA">`)
+2. Include the SHA in your report so findings can be correlated with a specific build
+3. Compare against `git log --oneline -1` to note whether the latest code is deployed
 
 ## Important Rules
 - You must NOT modify any source files

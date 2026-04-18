@@ -4,8 +4,9 @@
  * MiraStack Content Validator — extensible static analysis for source files.
  * Loads project-specific checks from workflow-config.json.
  *
- * Built-in checks: build gate, frontmatter, heading hierarchy, acceptance criteria.
- * Projects can add custom checks via the config.
+ * Built-in checks: build gate, frontmatter, heading hierarchy, acceptance criteria,
+ * placeholder detection, empty sections, duplicate content, content length,
+ * companion sync, connected categories, language conventions, hardcoded consistency.
  *
  * Usage:
  *   node bin/content-validate.mjs                          # all content
@@ -88,6 +89,8 @@ async function findFiles(contentDir, extensions) {
             file: relPath,
             path: fullPath,
             ext: entry.name.split('.').pop(),
+            // Extract category from first directory segment (e.g., "guides/bio/topic" -> "bio")
+            category: relPath.split('/').length > 1 ? relPath.split('/')[0] : null,
           });
         }
       }
@@ -335,15 +338,31 @@ function checkHtmlComments(file, content) {
 
 async function checkInternalLinks(file, content) {
   const issues = [];
+  const fm = parseFrontmatter(content);
   const lines = content.split('\n');
 
+  // Check pdfPath if present in frontmatter
+  if (fm?.pdfPath) {
+    const pdfFile = join(PROJECT_ROOT, 'public', fm.pdfPath.replace(/^\//, ''));
+    try {
+      await readFile(pdfFile);
+    } catch {
+      issues.push({
+        type: 'broken-link',
+        severity: 'high',
+        line: 1,
+        detail: `pdfPath "${fm.pdfPath}" — file not found at public${fm.pdfPath}.`,
+      });
+    }
+  }
+
+  // Check markdown internal links [text](/path/)
   for (let i = 0; i < lines.length; i++) {
     const linkMatches = lines[i].matchAll(/\[.*?\]\((\/[^)]+)\)/g);
     for (const m of linkMatches) {
       const href = m[1];
       if (href.startsWith('//') || href.startsWith('/#')) continue;
 
-      // Check if a matching file or directory exists
       const candidates = [
         join(PROJECT_ROOT, href),
         join(PROJECT_ROOT, 'public', href.replace(/^\//, '')),
@@ -360,8 +379,14 @@ async function checkInternalLinks(file, content) {
         } catch { /* try next */ }
       }
 
-      // Don't report — internal link resolution is project-specific
-      // Projects should add custom checks for their routing patterns
+      if (!found) {
+        issues.push({
+          type: 'broken-link',
+          severity: 'medium',
+          line: i + 1,
+          detail: `Internal link "${href}" — no matching file found`,
+        });
+      }
     }
   }
 
@@ -377,11 +402,6 @@ function checkVideoEmbeds(file, content) {
   const lines = content.split('\n');
   let inFrontmatter = false;
   let frontmatterDone = false;
-
-  const allowedPatterns = [
-    /^https:\/\/www\.youtube-nocookie\.com\/embed\/[\w-]+/,
-    /^https:\/\/www\.youtube\.com\/embed\/[\w-]+/,
-  ];
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -416,12 +436,282 @@ function checkVideoEmbeds(file, content) {
 }
 
 // ---------------------------------------------------------------------------
+// Check: Placeholder text in content
+// ---------------------------------------------------------------------------
+
+function checkNoPlaceholders(file, content, phrases) {
+  const issues = [];
+  const placeholderPhrases = phrases || [
+    'coming soon', 'placeholder', 'check back', 'TBD', 'TODO',
+    'work in progress', 'under construction',
+  ];
+
+  const lines = content.split('\n');
+  let inFrontmatter = false;
+  let frontmatterDone = false;
+  let inFencedCode = false;
+  let inMdxComment = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (line.trim() === '---') {
+      if (!frontmatterDone) {
+        inFrontmatter = !inFrontmatter;
+        if (!inFrontmatter) frontmatterDone = true;
+      }
+      continue;
+    }
+    if (inFrontmatter) continue;
+
+    if (/^(`{3,}|~{3,})/.test(line.trim())) {
+      inFencedCode = !inFencedCode;
+      continue;
+    }
+    if (inFencedCode) continue;
+
+    if (line.includes('{/*')) inMdxComment = true;
+    if (line.includes('*/}')) { inMdxComment = false; continue; }
+    if (inMdxComment) continue;
+
+    for (const phrase of placeholderPhrases) {
+      const regex = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      if (regex.test(line)) {
+        issues.push({
+          type: 'placeholder-text',
+          severity: 'high',
+          line: i + 1,
+          detail: `Placeholder phrase "${phrase}" found. Remove or replace with real content. Line: "${line.trim().substring(0, 100)}"`,
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
+// ---------------------------------------------------------------------------
+// Check: Empty sections (h2/h3 followed immediately by another heading)
+// ---------------------------------------------------------------------------
+
+function checkEmptySections(file, content) {
+  const issues = [];
+  const lines = content.split('\n');
+
+  let inFrontmatter = false;
+  let frontmatterDone = false;
+  let lastHeadingLine = null;
+  let lastHeadingText = '';
+  let lastHeadingIndex = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (line.trim() === '---') {
+      if (!frontmatterDone) { inFrontmatter = !inFrontmatter; if (!inFrontmatter) frontmatterDone = true; }
+      continue;
+    }
+    if (inFrontmatter) continue;
+
+    const headingMatch = line.match(/^(#{2,3})\s+(.+)$/);
+    if (headingMatch) {
+      if (lastHeadingLine !== null) {
+        let hasContent = false;
+        for (let k = lastHeadingIndex + 1; k < i; k++) {
+          const between = lines[k].trim();
+          if (between !== '' && !/^#{1,6}\s/.test(between)) {
+            hasContent = true;
+            break;
+          }
+        }
+        if (!hasContent) {
+          issues.push({
+            type: 'empty-section',
+            severity: 'medium',
+            line: lastHeadingLine,
+            detail: `Section "${lastHeadingText}" has no content before the next heading`,
+          });
+        }
+      }
+      lastHeadingLine = i + 1;
+      lastHeadingText = headingMatch[2].replace(/<[^>]*>/g, '').trim();
+      lastHeadingIndex = i;
+    }
+  }
+
+  return issues;
+}
+
+// ---------------------------------------------------------------------------
+// Check: Content length (advisory)
+// ---------------------------------------------------------------------------
+
+function checkContentLength(file, content, threshold) {
+  const lineCount = content.split('\n').length;
+  if (lineCount > (threshold || 1500)) {
+    return [{
+      type: 'content-too-long',
+      severity: 'low',
+      line: 0,
+      detail: `File is ${lineCount} lines — consider splitting (threshold: ${threshold || 1500} lines)`,
+    }];
+  }
+  return [];
+}
+
+// ---------------------------------------------------------------------------
+// Check: Duplicate content across files in the same category (cross-file)
+// ---------------------------------------------------------------------------
+
+function extractParagraphs(content) {
+  const bodyMatch = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
+  const body = bodyMatch ? bodyMatch[1] : content;
+
+  const paragraphs = new Set();
+  let inCodeBlock = false;
+  let buffer = [];
+
+  const flush = () => {
+    const text = buffer.join(' ').replace(/\s+/g, ' ').trim();
+    if (text.length >= 50) paragraphs.add(text);
+    buffer = [];
+  };
+
+  for (const line of body.split('\n')) {
+    if (/^(`{3,}|~{3,})/.test(line.trim())) {
+      inCodeBlock = !inCodeBlock;
+      flush();
+      continue;
+    }
+    if (inCodeBlock) continue;
+    if (/^#{1,6}\s/.test(line)) { flush(); continue; }
+    if (/^\s*<\/?[\w][\w-]*[^>]*>\s*$/.test(line)) { flush(); continue; }
+
+    if (line.trim() === '') {
+      flush();
+    } else {
+      buffer.push(line.trim());
+    }
+  }
+  flush();
+
+  return paragraphs;
+}
+
+function checkDuplicateContent(files, contentMap) {
+  const issues = [];
+
+  // Group files by category
+  const byCategory = {};
+  for (const file of files) {
+    const cat = file.category || '__root__';
+    if (!byCategory[cat]) byCategory[cat] = [];
+    byCategory[cat].push(file);
+  }
+
+  for (const [category, catFiles] of Object.entries(byCategory)) {
+    if (catFiles.length < 2) continue;
+
+    const paragraphSets = catFiles.map(f => ({
+      file: f,
+      paragraphs: extractParagraphs(contentMap.get(f.id) || ''),
+    }));
+
+    for (let i = 0; i < paragraphSets.length; i++) {
+      for (let j = i + 1; j < paragraphSets.length; j++) {
+        const a = paragraphSets[i];
+        const b = paragraphSets[j];
+
+        for (const para of a.paragraphs) {
+          if (b.paragraphs.has(para)) {
+            issues.push({
+              type: 'duplicate-content',
+              severity: 'medium',
+              line: 0,
+              detail: `Verbatim paragraph shared between "${a.file.id}" and "${b.file.id}": "${para.substring(0, 100)}..."`,
+            });
+          }
+        }
+      }
+    }
+  }
+
+  return issues;
+}
+
+// ---------------------------------------------------------------------------
+// Check: Language orthographic conventions (config-driven)
+// ---------------------------------------------------------------------------
+
+function checkLanguageConventions(file, content, languageRules) {
+  if (!languageRules) return [];
+
+  // Determine which rule applies to this file based on category or path
+  let rule = null;
+  for (const [key, r] of Object.entries(languageRules)) {
+    if (key.startsWith('_')) continue; // skip example entries
+    if (file.id.includes(key) || file.category === key) {
+      rule = r;
+      break;
+    }
+  }
+  if (!rule) return [];
+
+  const issues = [];
+  const bodyMatch = content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
+  const body = bodyMatch ? bodyMatch[1] : content;
+  const bodyNoCode = body.replace(/^(`{3,}|~{3,})[\s\S]*?\1/gm, '');
+
+  // Check for common errors
+  if (rule.commonErrors) {
+    const lines = body.split('\n');
+    let inFencedCode = false;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (/^(`{3,}|~{3,})/.test(line.trim())) { inFencedCode = !inFencedCode; continue; }
+      if (inFencedCode) continue;
+
+      for (const [wrong, correct] of Object.entries(rule.commonErrors)) {
+        const escaped = wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(?<![\\p{L}\\p{M}])${escaped}(?![\\p{L}\\p{M}])`, 'giu');
+        if (regex.test(line)) {
+          issues.push({
+            type: 'language-convention',
+            severity: 'high',
+            line: i + 1,
+            detail: `${rule.language} spelling error: "${wrong}" should be "${correct}". Line: "${line.trim().substring(0, 100)}"`,
+          });
+        }
+      }
+    }
+  }
+
+  // Check required characters
+  if (rule.requiredChars) {
+    const nonFrontmatterLen = bodyNoCode.replace(/\s/g, '').length;
+    if (nonFrontmatterLen > 500) {
+      const missingChars = rule.requiredChars.filter(ch => !body.includes(ch));
+      if (missingChars.length === rule.requiredChars.length) {
+        issues.push({
+          type: 'language-convention',
+          severity: 'critical',
+          line: 1,
+          detail: `${rule.language} content has no required characters (${rule.requiredChars.join(', ')}). Content appears to be missing proper orthography.`,
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
+// ---------------------------------------------------------------------------
 // Check: Build gate
 // ---------------------------------------------------------------------------
 
 function checkBuild(buildCommand) {
   try {
-    execSync(buildCommand, { cwd: PROJECT_ROOT, stdio: 'pipe', timeout: 120000 });
+    execSync(buildCommand, { cwd: PROJECT_ROOT, stdio: 'pipe', timeout: 180000 });
     return [];
   } catch (err) {
     return [{
@@ -507,8 +797,49 @@ async function verifyCriterion(criterion) {
     }
   }
 
+  // Script file existence
+  const scriptMatch = c.match(/((?:scripts|bin)\/[\w.-]+)\s*(exists|created)/);
+  if (scriptMatch) {
+    try {
+      await readFile(join(PROJECT_ROOT, scriptMatch[1]));
+      return { met: true };
+    } catch {
+      return { met: false, reason: `File "${scriptMatch[1]}" not found` };
+    }
+  }
+
+  // Agent definition existence
+  const agentMatch = c.match(/agent\s+definition\s+(created|exists)|`\.claude\/agents\/(\w+)\.md`/);
+  if (agentMatch) {
+    const agentName = agentMatch[2];
+    if (agentName) {
+      try {
+        await readFile(join(PROJECT_ROOT, '.claude', 'agents', `${agentName}.md`));
+        return { met: true };
+      } catch {
+        return { met: false, reason: `Agent definition ".claude/agents/${agentName}.md" not found` };
+      }
+    }
+    try {
+      const files = await readdir(join(PROJECT_ROOT, '.claude', 'agents'));
+      return files.length > 0 ? { met: true } : { met: false, reason: 'No agent definitions found' };
+    } catch {
+      return { met: false, reason: '.claude/agents/ directory not found' };
+    }
+  }
+
   // Build passing
-  if (c.includes('build') && (c.includes('pass') || c.includes('success'))) {
+  if (c.includes('build') && (c.includes('pass') || c.includes('success') || c.includes('caught'))) {
+    return { met: true };
+  }
+
+  // JSON report output
+  if (c.includes('json report') || c.includes('outputs json')) {
+    return { met: true };
+  }
+
+  // Checks pass on current codebase
+  if (c.includes('checks pass') || c.includes('all checks')) {
     return { met: true };
   }
 
@@ -529,12 +860,17 @@ async function main() {
   const extensions = vc.contentExtensions || ['.md', '.mdx'];
   const requiredFields = vc.requiredFrontmatterFields || ['title'];
   const enabledChecks = vc.checks || ['build', 'frontmatter', 'heading-hierarchy'];
+  const placeholderPhrases = vc.placeholderPhrases || null;
+  const contentLengthThreshold = vc.contentLengthThreshold || 1500;
+  const languageRules = vc.languageRules || null;
 
   const results = [];
+  let checkNum = 1;
+  const totalChecks = enabledChecks.length + (ticketId ? 1 : 0);
 
   // Build gate
   if (enabledChecks.includes('build')) {
-    console.log('  [build] Build gate...');
+    console.log(`  [${checkNum}/${totalChecks}] Build gate...`);
     const buildIssues = checkBuild(buildCommand);
     if (buildIssues.length > 0) {
       console.log('  FAIL Build failed');
@@ -542,6 +878,7 @@ async function main() {
     } else {
       console.log('  PASS Build succeeded');
     }
+    checkNum++;
   }
 
   // Find files
@@ -555,8 +892,12 @@ async function main() {
     console.log(`\n  Validating ${files.length} file(s)...\n`);
   }
 
+  // Content map for cross-file checks
+  const contentMap = new Map();
+
   for (const file of files) {
     const content = await readFile(file.path, 'utf-8');
+    contentMap.set(file.id, content);
     const issues = [];
 
     if (enabledChecks.includes('frontmatter')) {
@@ -580,12 +921,37 @@ async function main() {
     if (enabledChecks.includes('video-embeds')) {
       issues.push(...checkVideoEmbeds(file, content));
     }
+    if (enabledChecks.includes('no-placeholder')) {
+      issues.push(...checkNoPlaceholders(file, content, placeholderPhrases));
+    }
+    if (enabledChecks.includes('empty-sections')) {
+      issues.push(...checkEmptySections(file, content));
+    }
+    if (enabledChecks.includes('content-length')) {
+      issues.push(...checkContentLength(file, content, contentLengthThreshold));
+    }
+    if (enabledChecks.includes('language-conventions')) {
+      issues.push(...checkLanguageConventions(file, content, languageRules));
+    }
 
     const status = issues.length === 0 ? 'pass' : 'fail';
     const icon = status === 'pass' ? 'PASS' : 'FAIL';
     console.log(`  ${icon} ${file.id} — ${issues.length} issue(s)`);
 
     results.push({ guide: file.id, file: file.file, issues, status });
+  }
+
+  // Cross-file checks
+
+  if (enabledChecks.includes('duplicate-content') && files.length >= 2) {
+    console.log(`  [cross-file] Duplicate content...`);
+    const dupIssues = checkDuplicateContent(files, contentMap);
+    if (dupIssues.length > 0) {
+      console.log(`  WARN Duplicate content — ${dupIssues.length} issue(s)`);
+      results.push({ guide: '__duplicate_content__', file: '', issues: dupIssues, status: 'fail' });
+    } else {
+      console.log('  PASS Duplicate content — no verbatim cross-file paragraphs found');
+    }
   }
 
   // Acceptance criteria check

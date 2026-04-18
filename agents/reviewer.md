@@ -57,6 +57,55 @@ Fix: <suggested correction>" --source reviewer
 
 Use type `bug` for factual errors, `task` for missing content, `chore` for formatting.
 
+## Report Output (REQUIRED -- blocks commits if report hook is enabled)
+
+After completing a review, you MUST write a structured report to `.reviews/<timestamp>/report.json`. If a pre-commit hook is configured, it checks for this report before allowing content commits. Without it, the commit is blocked.
+
+### Steps
+
+1. Create the review directory with current UTC timestamp (replace colons with hyphens):
+   ```bash
+   TIMESTAMP=$(date -u +%Y-%m-%dT%H-%M-%SZ)
+   mkdir -p .reviews/$TIMESTAMP
+   ```
+
+2. Write `.reviews/<timestamp>/report.json` with this exact schema:
+   ```json
+   {
+     "timestamp": "2026-04-11T14:32:00Z",
+     "agent": "reviewer",
+     "filesReviewed": [
+       "src/content/guides/topic-a.mdx",
+       "public/data/supplementary.json"
+     ],
+     "totalIssues": 0,
+     "issues": []
+   }
+   ```
+
+3. Populate `filesReviewed` with EVERY file you actually read and reviewed -- not just ones with issues. If a pre-commit hook is configured, it verifies that each staged content file is in this list before allowing the commit.
+
+4. If you found issues, include them in the `issues` array AND create tkt tickets as per the existing workflow:
+   ```json
+   {
+     "issues": [
+       {
+         "file": "src/content/guides/topic-a.mdx",
+         "line": 142,
+         "severity": "high",
+         "detail": "Description of the factual error and suggested correction",
+         "ticket": "t-abcd"
+       }
+     ]
+   }
+   ```
+
+5. Set `totalIssues` to the length of the `issues` array. If `totalIssues > 0`, the commit will be blocked until the issues are addressed in a new @creator pass followed by a new @reviewer pass with `totalIssues = 0`.
+
+### Why this matters
+
+When a pre-commit hook is configured, it refuses to commit content files unless a clean reviewer report exists that covers all staged files. This is the mechanical enforcement that prevents the main assistant from skipping the pipeline. Without your report, no content commit can land.
+
 ## After Review
 Summarize your findings:
 - Total issues found (by severity)

@@ -43,8 +43,12 @@ The validation script is project-specific. Common checks include:
 3. **Syntax checks** — parsing errors in project-specific formats (KaTeX, MDX, etc.)
 4. **Link validation** — internal links point to real files/routes
 5. **Structure checks** — heading hierarchy, file organization
-6. **Acceptance criteria** (when `--ticket` provided) — verifies each criterion against current state
-7. **Smoke tests** — headless browser checks on the built site (if configured)
+6. **Acceptance criteria** (when `--ticket` provided) — reads the ticket's acceptance criteria and verifies each one against the current codebase state. Checks file existence, agent definitions, build status, and flags unverifiable criteria for manual review
+7. **Placeholder detection** — flags "coming soon", "TBD", "TODO", and similar phrases in published content
+8. **Companion sync** — checks that companion materials (flashcards, practice questions, derived assets) are up to date with their parent content
+9. **Connected categories** — verifies all content categories are wired to site infrastructure (routes, navigation, styles)
+10. **Language conventions** — per-subject spelling and orthographic rules for foreign-language content
+11. **Smoke tests** — headless browser checks on the built site (if configured)
 
 ## Creating Tickets
 
@@ -75,7 +79,7 @@ Priority mapping:
 
 ## After Validation
 Summarize:
-- Total issues by check type
+- Total issues by check type (content validation + smoke tests)
 - Tickets created (with IDs)
 - Files with no issues
 - Recommended next step (proceed to @reviewer if clean, or fix issues first)

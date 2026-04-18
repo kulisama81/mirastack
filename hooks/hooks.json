@@ -49,7 +49,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "STATUS=$(cat | jq -r '.tool_input.status // empty'); if [ \"$STATUS\" = \"closed\" ]; then LATEST=$(ls -t .ux-reviews/*/report.json 2>/dev/null | head -1); if [ -z \"$LATEST\" ] || [ $(( $(date +%s) - $(stat -f %m \"$LATEST\") )) -gt 1800 ] || [ $(jq '.totalIssues' \"$LATEST\" 2>/dev/null || echo 1) -gt 0 ]; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"No recent clean UX review found. You must spawn the @ux-reviewer agent and get a clean report (0 issues) before closing any ticket.\"}}'; fi; fi",
+            "command": "INPUT=$(cat); STATUS=$(echo \"$INPUT\" | jq -r '.tool_input.status // empty'); if [ \"$STATUS\" = \"closed\" ]; then TID=$(echo \"$INPUT\" | jq -r '.tool_input.ticket_id // empty'); if [ -n \"$TID\" ]; then TAGS=$(PATH=\"$HOME/go/bin:$PATH\" tkt show \"$TID\" 2>/dev/null | grep '^tags:' || echo ''); if echo \"$TAGS\" | grep -qiE 'tooling|seo|analytics|autoresearch|growth|ordering|dx|infrastructure|ux|agent|validation'; then exit 0; fi; fi; LATEST=$(ls -t .ux-reviews/*/report.json 2>/dev/null | head -1); if [ -z \"$LATEST\" ] || [ $(( $(date +%s) - $(stat -f %m \"$LATEST\") )) -gt 1800 ] || [ $(jq '.totalIssues' \"$LATEST\" 2>/dev/null || echo 1) -gt 0 ]; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"No recent clean UX review found. You must spawn the @ux-reviewer agent and get a clean report (0 issues) before closing any ticket.\"}}'; fi; fi",
             "statusMessage": "Checking UX review status...",
             "timeout": 10
           }
